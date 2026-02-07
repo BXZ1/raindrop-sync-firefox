@@ -23,13 +23,14 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "raindrop-importer@bxz1.github.io",
-      "strict_min_version": "109.0"
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ],
+        "optional": []
+      }
     }
-  },
-  "data_collection_permissions": {
-    "usage": false,
-    "technical": false,
-    "locales": false
   },
   "background": {
     "scripts": [
