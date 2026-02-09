@@ -4,27 +4,90 @@ const COLLECTIONS_CHILDREN_URL = 'https://api.raindrop.io/rest/v1/collections/ch
 
 const TOOLBAR_ID = 'toolbar_____';
 const SYNC_ALARM_NAME = 'raindrop_sync';
+const PAGE_SIZE = 50; // Raindrop API page size
+const RATE_LIMIT_REQUESTS_PER_MINUTE = 120; // Raindrop API rate limit
+const RATE_LIMIT_DELAY_MS = Math.ceil((60 * 1000) / RATE_LIMIT_REQUESTS_PER_MINUTE); // ~500ms between requests
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 1000; // Base delay for exponential backoff
 
 // Cache for Raindrop Collections (ID -> {title, parentId})
 const collectionMap = {};
 // Cache for Firefox Folders (Raindrop ID -> Firefox Folder ID)
 const firefoxFolderCache = {};
 
+// Rate limiting: Track last request time
+let lastRequestTime = 0;
+
+/**
+ * Rate limiting helper: Ensures we don't exceed API rate limits
+ * Raindrop.io allows 120 requests per minute (~500ms between requests)
+ */
+async function rateLimitedFetch(url, options) {
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTime;
+    
+    if (timeSinceLastRequest < RATE_LIMIT_DELAY_MS) {
+        const delay = RATE_LIMIT_DELAY_MS - timeSinceLastRequest;
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    
+    lastRequestTime = Date.now();
+    
+    // Retry logic with exponential backoff
+    let lastError;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            
+            // Handle rate limit (429) with retry
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                const delay = retryAfter 
+                    ? parseInt(retryAfter) * 1000 
+                    : RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+                
+                if (attempt < MAX_RETRIES - 1) {
+                    console.warn(`Rate limit hit, retrying after ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+            }
+            
+            return response;
+        } catch (error) {
+            lastError = error;
+            // Only retry on network errors, not on 4xx errors (except 429)
+            if (attempt < MAX_RETRIES - 1) {
+                const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    throw lastError || new Error('Request failed after retries');
+}
+
 /**
  * 1. Fetch all Raindrop Collections (Root and Nested) and map their structure.
  */
 async function fetchRaindropCollections(apiToken) {
-    const fetchRoot = fetch(COLLECTIONS_ROOT_URL, {
+    const fetchRoot = rateLimitedFetch(COLLECTIONS_ROOT_URL, {
         headers: { 'Authorization': `Bearer ${apiToken}` }
     }).then(async res => {
-        if (!res.ok) throw new Error(`API Error (Root): ${res.status}`);
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => 'Unknown error');
+            throw new Error(`API Error (Root Collections): ${res.status} ${res.statusText} - ${errorText}`);
+        }
         return res.json();
     });
 
-    const fetchChildren = fetch(COLLECTIONS_CHILDREN_URL, {
+    const fetchChildren = rateLimitedFetch(COLLECTIONS_CHILDREN_URL, {
         headers: { 'Authorization': `Bearer ${apiToken}` }
     }).then(async res => {
-        if (!res.ok) throw new Error(`API Error (Children): ${res.status}`);
+        if (!res.ok) {
+            const errorText = await res.text().catch(() => 'Unknown error');
+            throw new Error(`API Error (Child Collections): ${res.status} ${res.statusText} - ${errorText}`);
+        }
         return res.json();
     });
 
@@ -37,15 +100,17 @@ async function fetchRaindropCollections(apiToken) {
         const allCollections = [...(rootData.items || []), ...(childrenData.items || [])];
 
         for (const collection of allCollections) {
-            collectionMap[collection._id] = {
+            // Ensure consistent string type for IDs
+            const collectionId = String(collection._id);
+            collectionMap[collectionId] = {
                 title: collection.title,
-                parentId: collection.parent?.$id || null
+                parentId: collection.parent?.$id ? String(collection.parent.$id) : null
             };
         }
         return true;
     } catch (error) {
         console.error('Failed to fetch Raindrop collections:', error);
-        throw new Error('Failed to fetch collections. Check API Token.');
+        throw new Error(`Failed to fetch collections: ${error.message}`);
     }
 }
 
@@ -85,21 +150,26 @@ async function getOrCreateTargetFolder(folderName) {
  * Recursively creates the Firefox folder structure for the Raindrop collection.
  */
 async function getOrCreateCollectionFolder(raindropCollectionId, targetRootFolderId, importedRootCollectionId = null) {
-    // System collections / Unsorted
-    if (!raindropCollectionId || raindropCollectionId === -1 || raindropCollectionId === 0 || raindropCollectionId === -99) {
+    // Normalize IDs to strings for consistent comparison
+    const normalizedId = String(raindropCollectionId);
+    const normalizedImportedId = importedRootCollectionId ? String(importedRootCollectionId) : null;
+    
+    // System collections / Unsorted (check both string and number forms)
+    const systemIds = ['-1', '-99', '0', '-1', '-99', '0'];
+    if (!raindropCollectionId || systemIds.includes(normalizedId)) {
         return targetRootFolderId;
     }
 
     // Flatten logic: If this is the collection we are importing, don't create a subfolder for it.
-    if (importedRootCollectionId && String(raindropCollectionId) === String(importedRootCollectionId)) {
+    if (normalizedImportedId && normalizedId === normalizedImportedId) {
         return targetRootFolderId;
     }
 
-    if (firefoxFolderCache[raindropCollectionId]) {
-        return firefoxFolderCache[raindropCollectionId];
+    if (firefoxFolderCache[normalizedId]) {
+        return firefoxFolderCache[normalizedId];
     }
 
-    const collectionData = collectionMap[raindropCollectionId];
+    const collectionData = collectionMap[normalizedId];
 
     if (!collectionData) {
         return targetRootFolderId; // Fallback to root
@@ -128,7 +198,7 @@ async function getOrCreateCollectionFolder(raindropCollectionId, targetRootFolde
         });
     }
 
-    firefoxFolderCache[raindropCollectionId] = subFolder.id;
+    firefoxFolderCache[normalizedId] = subFolder.id;
     return subFolder.id;
 }
 
@@ -137,21 +207,16 @@ async function getOrCreateCollectionFolder(raindropCollectionId, targetRootFolde
  */
 function getDescendantCollectionIds(rootId) {
     const descendants = [];
-    const queue = [rootId];
-
-    // Convert string IDs to numbers if necessary for comparison, strictly depends on API response types
-    // Raindrop IDs are integers usually.
+    const queue = [String(rootId)]; // Normalize to string for consistent comparison
 
     while (queue.length > 0) {
         const currentId = queue.shift();
 
         // Find all children of currentId
         for (const [id, data] of Object.entries(collectionMap)) {
-            // data.parentId comes from the API. Check for type consistency (string/int)
-            // We'll trust loose equality or ensure types match in map population
-            // collectionMap keys are strings because of Object.entries
-
-            if (String(data.parentId) === String(currentId)) {
+            // Ensure consistent string comparison
+            const parentId = data.parentId ? String(data.parentId) : null;
+            if (parentId === currentId) {
                 descendants.push(id);
                 queue.push(id);
             }
@@ -170,19 +235,23 @@ async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRoo
 
     while (hasMore) {
         searchParams.set('page', page);
+        searchParams.set('perpage', PAGE_SIZE);
 
-        const response = await fetch(`${url}?${searchParams.toString()}`, {
+        const fullUrl = `${url}?${searchParams.toString()}`;
+        const response = await rateLimitedFetch(fullUrl, {
             headers: { 'Authorization': `Bearer ${apiToken}` }
         });
 
         if (!response.ok) {
-            throw new Error(`Raindrop API Error: ${await response.text()}`);
+            const errorText = await response.text().catch(() => 'Unknown error');
+            throw new Error(`Raindrop API Error (${url}): ${response.status} ${response.statusText} - ${errorText}`);
         }
 
         const data = await response.json();
-        const raindrops = data.items;
+        const raindrops = data.items || [];
 
-        if (!raindrops || raindrops.length === 0) {
+        // Check if we have items to process
+        if (raindrops.length === 0) {
             hasMore = false;
             break;
         }
@@ -199,8 +268,12 @@ async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRoo
             importedCount++;
         }
 
-        // Check if we reached the last page
-        if (raindrops.length < 50) {
+        // Improved pagination logic: Check if we got fewer items than page size
+        // Also check if count exists in response to determine if more pages exist
+        if (raindrops.length < PAGE_SIZE) {
+            hasMore = false;
+        } else if (data.count !== undefined && importedCount >= data.count) {
+            // If API provides total count, use it to determine if we're done
             hasMore = false;
         } else {
             page++;
@@ -246,7 +319,9 @@ async function importRaindropBookmarks(settings) {
         if (mode === 'tag') {
             // Import by Tag: Single global fetch
             const url = RAINDROP_API_URL + '/0';
-            const searchParams = new URLSearchParams({ perpage: 50, search: `#${configValue}` });
+            // Fix: Only add # prefix if tag doesn't already start with it
+            const tagValue = configValue.trim().startsWith('#') ? configValue.trim() : `#${configValue.trim()}`;
+            const searchParams = new URLSearchParams({ search: tagValue });
 
             totalImported = await fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRootFolderId);
 
@@ -263,7 +338,7 @@ async function importRaindropBookmarks(settings) {
 
             for (const collectionId of collectionsToFetch) {
                 const url = RAINDROP_API_URL + `/${collectionId}`;
-                const searchParams = new URLSearchParams({ perpage: 50 }); // No search filter, just get all in collection
+                const searchParams = new URLSearchParams(); // No search filter, just get all in collection
 
                 // Pass rootCollectionId to flatten the structure
                 const count = await fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRootFolderId, rootCollectionId);
@@ -277,6 +352,8 @@ async function importRaindropBookmarks(settings) {
 
     } catch (error) {
         console.error('Import failed:', error);
+        // Clear cache on error to prevent stale data
+        for (const key in firefoxFolderCache) { delete firefoxFolderCache[key]; }
         return { success: false, error: error.message };
     }
 }
@@ -324,10 +401,13 @@ async function performSilentSync() {
 async function updateAlarm(interval) {
     if (!interval) interval = 0;
 
+    // Ensure clear completes before creating new alarm to prevent race condition
     await browser.alarms.clear(SYNC_ALARM_NAME);
 
     if (interval > 0) {
-        browser.alarms.create(SYNC_ALARM_NAME, { periodInMinutes: interval });
+        // Wait a brief moment to ensure clear operation completed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await browser.alarms.create(SYNC_ALARM_NAME, { periodInMinutes: interval });
         console.log(`Alarm set for every ${interval} minutes.`);
     } else {
         console.log('Alarm cleared (Manual Mode).');

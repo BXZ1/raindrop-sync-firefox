@@ -36,7 +36,8 @@ async function loadState() {
         elements.apiToken.value = STATE.apiToken || '';
         elements.targetFolder.value = STATE.targetFolder || 'Imported from Raindrop';
         elements.configValueTag.value = STATE.tagValue || 'firefox';
-        elements.configValueCollection.value = STATE.collectionValue || '';
+        // Fix: Use default 'Bookmarks' if collectionValue is empty/undefined
+        elements.configValueCollection.value = STATE.collectionValue || 'Bookmarks';
         elements.syncInterval.value = STATE.syncInterval || 0;
 
         // Restore method selection
@@ -220,7 +221,8 @@ elements.importBtn.addEventListener('click', async () => {
 
     // 2. Prepare Data
     await saveState(); // Ensure latest is saved
-    const configValue = STATE.method === 'tag' ? STATE.tagValue : STATE.collectionValue;
+    // Fix: Trim configValue before validation to match saveState behavior
+    const configValue = (STATE.method === 'tag' ? STATE.tagValue : STATE.collectionValue)?.trim();
 
     if (!configValue) {
         showStatus('error', `Please enter a ${STATE.method === 'tag' ? 'tag' : 'collection'} name.`);
@@ -244,14 +246,16 @@ elements.importBtn.addEventListener('click', async () => {
             }
         });
 
-        if (response.success) {
+        // Fix: Validate response exists before accessing properties
+        if (response && response.success) {
             showStatus('success', `Done! Imported ${response.count} bookmarks to "${response.folder}".`);
             updateLastSyncDisplay(Date.now());
         } else {
-            showStatus('error', `Import Failed: ${response.error}`);
+            const errorMsg = response?.error || 'Unknown error occurred';
+            showStatus('error', `Import Failed: ${errorMsg}`);
         }
     } catch (e) {
-        showStatus('error', `Error: ${e.message}`);
+        showStatus('error', `Error: ${e.message || 'Failed to communicate with background script'}`);
     } finally {
         elements.importBtn.disabled = false;
         elements.importBtn.querySelector('span').textContent = 'Start Import';
