@@ -12,8 +12,9 @@ Raindrop.io Sync is a specialized Firefox extension that bridges the gap between
 ## 🖼️ Screenshots
 
 <p align="center">
-  <img src="screenshots/1.png" width="35%" alt="Configuration View">
-  <img src="screenshots/2.png" width="35%" alt="Import Selection">
+  <img src="screenshots/1.png" width="29%">
+  <img src="screenshots/2.png" width="29%">
+  <img src="screenshots/3.png" width="29%">
 </p>
 
 ## Features 🚀
@@ -21,11 +22,11 @@ Raindrop.io Sync is a specialized Firefox extension that bridges the gap between
 Most bookmark managers keep your links tucked away in a separate app. This extension puts them exactly where you need them: **the native Firefox Bookmarks Toolbar.**
 
 *   **Set and Forget**: Scheduled **Auto-Sync** keeps your toolbar fresh every few hours, daily, or weekly.
-*   **Offline Safety**: Won't touch your bookmarks if the API is down or you're offline.
 *   **Source Selection**: Sync multiple **Collections** or **#tags** at once (separated by commas).
-*   **Preserves Order**: Automatically mirrors the sorting and structure of your Raindrop bookmarks.
+*   **Respects Manual Order**: Perfectly mirrors your **manual sorting** and folder structure from Raindrop.
 *   **Optional Flattening**: Choose to import everything into a single folder or preserve subfolders.
-*   **Privacy**: Open source, zero data collection, and local token storage.
+*   **Offline Reliability**: Won't touch your bookmarks if the API is down or you're offline.
+*   **Privacy**: Open source, **zero data collection**, and local token storage.
 
 ## Installation ⚙️
 
