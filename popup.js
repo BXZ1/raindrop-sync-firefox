@@ -17,7 +17,9 @@ const elements = {
     importBtn: document.getElementById('importBtn'),
     statusMsg: document.getElementById('statusMsg'),
     lastSyncMsg: document.getElementById('lastSyncMsg'),
-    tokenStatus: document.getElementById('tokenStatus')
+    tokenStatus: document.getElementById('tokenStatus'),
+    versionTag: document.getElementById('versionTag'),
+    starCount: document.getElementById('starCount')
 };
 
 // Default State
@@ -55,9 +57,49 @@ async function loadState() {
             validateToken(STATE.apiToken);
         }
 
+        // Update Version ID and Changelog Link
+        const manifest = browser.runtime.getManifest();
+        const version = manifest.version;
+        elements.versionTag.textContent = `v${version}`;
+        elements.versionTag.href = `https://github.com/BXZ1/raindrop-sync-firefox/releases/tag/v${version}`;
+
         updateLastSyncDisplay(stored.lastSync);
+        fetchGitHubStars();
     } catch (e) {
         console.error('Failed to load state', e);
+    }
+}
+
+async function fetchGitHubStars() {
+    const CACHE_KEY = 'github_stars_cache';
+    const CACHE_TTL = 3600000; // 1 hour
+
+    try {
+        const cached = await browser.storage.local.get(CACHE_KEY);
+        const now = Date.now();
+
+        if (cached[CACHE_KEY] && (now - cached[CACHE_KEY].timestamp < CACHE_TTL)) {
+            updateStarsUI(cached[CACHE_KEY].count);
+            return;
+        }
+
+        const response = await fetch('https://api.github.com/repos/BXZ1/raindrop-sync-firefox');
+        if (response.ok) {
+            const data = await response.json();
+            const count = data.stargazers_count;
+            updateStarsUI(count);
+            await browser.storage.local.set({
+                [CACHE_KEY]: { count, timestamp: now }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to fetch stars', e);
+    }
+}
+
+function updateStarsUI(count) {
+    if (elements.starCount && count !== undefined) {
+        elements.starCount.textContent = count;
     }
 }
 

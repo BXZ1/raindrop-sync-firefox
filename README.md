@@ -1,9 +1,11 @@
 # Raindrop.io Sync for Firefox
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Firefox Add-on](https://img.shields.io/amo/v/raindrop-sync-firefox?label=version&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/)
+[![GitHub stars](https://img.shields.io/github/stars/BXZ1/raindrop-sync-firefox?style=flat&logo=github)](https://github.com/BXZ1/raindrop-sync-firefox/stargazers)
 [![Mozilla Add-on Users](https://img.shields.io/amo/users/raindrop-sync-firefox?logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/)
+[![Firefox Add-on](https://img.shields.io/amo/v/raindrop-sync-firefox?label=version&logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/)
 [![Download on Firefox](https://img.shields.io/badge/Download-on%20Firefox-orange?logo=firefox)](https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/)
+
 
 **Bring your Raindrop.io bookmarks/collections directly into your native Firefox Bookmarks Toolbar.**  
 Raindrop.io Sync is a specialized Firefox extension that bridges the gap between your cloud bookmarks and your native browser experience.
@@ -37,6 +39,10 @@ Most bookmark managers keep your links tucked away in a separate app. This exten
 3.  **Pick your Source**: Select the **By Collection** or **By Tag** method. You can enter multiple names separated by commas (e.g., `Work, News, Tech Tips`).
 4.  **Set the Target**: Choose which folder in your **Bookmarks Toolbar** should hold the synced links (Default: `Imported from Raindrop`).
 5.  **Schedule Sync**: Choose your frequency and let the background script do the work.
+
+## Support ⭐
+
+If you find this tool useful, please consider giving it a **Star** on [GitHub](https://github.com/BXZ1/raindrop-sync-firefox). It helps the project grow and stay maintained!
 
 ## Development 🛠️
 

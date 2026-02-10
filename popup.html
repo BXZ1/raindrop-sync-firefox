@@ -14,6 +14,7 @@
             <div class="brand">
                 <img src="icon.png" class="brand-icon" alt="Logo">
                 <span>Raindrop.io Sync</span>
+                <a id="versionTag" class="version-tag" target="_blank" title="View Changelog"></a>
             </div>
             <button id="settingsToggle" class="settings-btn" title="Settings">
                 ⚙️
@@ -94,6 +95,7 @@
             <button id="importBtn" class="import-btn">
                 <span>Sync Now</span>
             </button>
+            <p id="lastSyncMsg" class="last-sync">Last Sync: Never</p>
 
             <!-- Status Feedback -->
             <div id="statusMsg" class="status-msg hidden">
@@ -103,10 +105,29 @@
         </main>
 
         <footer>
-            <p id="lastSyncMsg" class="last-sync">Last Sync: Never</p>
-            <div class="footer-links">
-                <a href="https://github.com/BXZ1/raindrop-sync-firefox" target="_blank">By BXZ1</a> •
-                <a href="https://github.com/BXZ1/raindrop-sync-firefox/discussions" target="_blank">Feedback</a>
+            <div class="footer-bottom">
+                <div class="author-area">
+                    <span>By</span>
+                    <a href="https://github.com/BXZ1" target="_blank" class="author-name">BXZ1</a>
+                </div>
+                <div class="footer-actions">
+                    <a href="https://github.com/BXZ1/raindrop-sync-firefox" target="_blank" class="support-chip"
+                        title="Star on GitHub">
+                        <img src="https://cdn.simpleicons.org/github/64748b" class="chip-icon" alt="GitHub">
+                        <span class="chip-label">Star</span>
+                        <span id="starCount" class="star-count"></span>
+                    </a>
+                    <a href="https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/" target="_blank"
+                        class="support-chip" title="Rate on Firefox">
+                        <img src="https://cdn.simpleicons.org/firefoxbrowser/64748b" class="chip-icon" alt="Firefox">
+                        <span class="chip-label">Rate</span>
+                    </a>
+                    <a href="https://github.com/BXZ1/raindrop-sync-firefox/discussions" target="_blank"
+                        class="support-chip" title="Send Feedback">
+                        <img src="https://cdn.simpleicons.org/theconversation/64748b" class="chip-icon" alt="Feedback">
+                        <span class="chip-label">Feedback</span>
+                    </a>
+                </div>
             </div>
         </footer>
     </div>
