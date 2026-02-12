@@ -518,11 +518,11 @@ browser.runtime.onStartup.addListener(async () => {
 browser.runtime.onInstalled.addListener(async () => {
     const stored = await browser.storage.local.get(['syncInterval']);
 
-    // Set default to Daily if not present
+    // Set default to 12 hours (720 minutes) if not present
     if (stored.syncInterval === undefined) {
-        await browser.storage.local.set({ syncInterval: 1440 });
-        await updateAlarm(1440);
-        console.log('Extension Installed: Default sync set to Daily (1440m).');
+        await browser.storage.local.set({ syncInterval: 720 });
+        await updateAlarm(720);
+        console.log('Extension Installed: Default sync set to 12 hours (720m).');
     }
 });
 
