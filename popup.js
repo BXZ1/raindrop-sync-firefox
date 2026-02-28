@@ -10,6 +10,7 @@ const elements = {
     collectionInputGroup: document.getElementById('collectionInputGroup'),
     configValueTag: document.getElementById('configValueTag'),
     configValueCollection: document.getElementById('configValueCollection'),
+    allInputGroup: document.getElementById('allInputGroup'),
     checkboxGroup: document.querySelector('.checkbox-group'), // Container for flatten option
     flattenImport: document.getElementById('flattenImport'),
     flattenHelpBtn: document.getElementById('flattenHelpBtn'),
@@ -19,8 +20,8 @@ const elements = {
     folderHelpBtn: document.getElementById('folderHelpBtn'),
     folderTooltip: document.getElementById('folderTooltip'),
     importBtn: document.getElementById('importBtn'),
-    statusMsg: document.getElementById('statusMsg'),
-    lastSyncMsg: document.getElementById('lastSyncMsg'),
+    btnTitle: document.getElementById('btnTitle'),
+    btnSubtitle: document.getElementById('btnSubtitle'),
     tokenStatus: document.getElementById('tokenStatus'),
     versionTag: document.getElementById('versionTag'),
     starCount: document.getElementById('starCount')
@@ -31,8 +32,8 @@ const STATE = {
     apiToken: '',
     targetFolder: 'Imported from Raindrop',
     method: 'collection', // 'tag' or 'collection'
-    tagValue: 'firefox',
-    collectionValue: 'Bookmarks',
+    tagValue: '',
+    collectionValue: '',
     syncInterval: 720, // 0 = off, value in minutes (Default: 12 Hours)
     flattenImport: false // When true, imports all to single folder
 };
@@ -46,9 +47,9 @@ async function loadState() {
         // Apply to UI
         elements.apiToken.value = STATE.apiToken || '';
         elements.targetFolder.value = STATE.targetFolder || 'Imported from Raindrop';
-        elements.configValueTag.value = STATE.tagValue || 'firefox';
-        elements.configValueCollection.value = STATE.collectionValue || 'Bookmarks';
-        elements.syncInterval.value = STATE.syncInterval || 0;
+        elements.configValueTag.value = STATE.tagValue || '';
+        elements.configValueCollection.value = STATE.collectionValue || '';
+        elements.syncInterval.value = STATE.syncInterval ?? 0;
         elements.flattenImport.checked = STATE.flattenImport || false;
 
         // Restore method selection
@@ -149,12 +150,15 @@ function timeAgo(timestamp) {
 }
 
 function updateLastSyncDisplay(timestamp) {
+    STATE.lastSync = timestamp;
+    if (elements.importBtn.classList.contains('loading') || elements.importBtn.classList.contains('error') || elements.importBtn.classList.contains('success')) {
+        return;
+    }
     if (!timestamp) {
-        elements.lastSyncMsg.textContent = 'Last Sync: Never';
+        elements.btnSubtitle.textContent = 'Last Sync: Never';
         return;
     }
     const date = new Date(timestamp);
-    const relativeTime = timeAgo(timestamp);
     const dateString = date.toLocaleString(undefined, {
         year: 'numeric',
         month: 'numeric',
@@ -162,7 +166,8 @@ function updateLastSyncDisplay(timestamp) {
         hour: 'numeric',
         minute: 'numeric'
     });
-    elements.lastSyncMsg.textContent = `Last Sync: ${dateString} (${relativeTime})`;
+    const relativeTime = timeAgo(timestamp);
+    elements.btnSubtitle.textContent = `Last Sync: ${dateString} (${relativeTime})`;
 }
 
 // Helper: Validate Token (Async API Check)
@@ -231,11 +236,18 @@ function selectMethod(method) {
     if (method === 'tag') {
         elements.tagInputGroup.style.display = 'block';
         elements.collectionInputGroup.style.display = 'none';
+        elements.allInputGroup.style.display = 'none';
         elements.checkboxGroup.style.display = 'flex'; // Only show for tags
-    } else {
+    } else if (method === 'collection') {
         elements.tagInputGroup.style.display = 'none';
         elements.collectionInputGroup.style.display = 'block';
+        elements.allInputGroup.style.display = 'none';
         elements.checkboxGroup.style.display = 'none'; // Hide for collections
+    } else if (method === 'all') {
+        elements.tagInputGroup.style.display = 'none';
+        elements.collectionInputGroup.style.display = 'none';
+        elements.allInputGroup.style.display = 'block';
+        elements.checkboxGroup.style.display = 'flex'; // Show for all, to allow flattening structure
     }
 
     saveState(); // Persist selection immediately
@@ -255,21 +267,27 @@ async function saveState() {
 
 // Status Feedback Helper
 function showStatus(type, text, autoHide = false) {
-    const el = elements.statusMsg;
-    el.className = `status-msg ${type}`;
-    el.querySelector('.status-text').textContent = text;
+    const btn = elements.importBtn;
+    const subtitle = elements.btnSubtitle;
 
-    const icon = el.querySelector('.status-icon');
+    btn.classList.remove('loading', 'error', 'success');
+    if (type) btn.classList.add(type);
+
     if (type === 'loading') {
-        icon.innerHTML = '<div class="spinner"></div>';
+        subtitle.innerHTML = `<div class="spinner-small"></div><span>${text}</span>`;
     } else if (type === 'success') {
-        icon.textContent = '✅';
+        subtitle.innerHTML = `<span>✨ ${text}</span>`;
+    } else if (type === 'error') {
+        subtitle.innerHTML = `<span>⚠️ ${text}</span>`;
     } else {
-        icon.textContent = '❌';
+        subtitle.textContent = text;
     }
 
     if (autoHide) {
-        setTimeout(() => el.classList.add('hidden'), 3000);
+        setTimeout(() => {
+            btn.classList.remove(type);
+            updateLastSyncDisplay(STATE.lastSync);
+        }, 5000); // Revert back to last sync after 5 seconds
     }
 }
 
@@ -384,14 +402,14 @@ elements.importBtn.addEventListener('click', async () => {
     if (!elements.apiToken.value.trim()) {
         elements.settingsPanel.classList.add('force-visible');
         elements.apiToken.focus();
-        showStatus('error', 'Please enter your Raindrop Test Token (Required).');
+        showStatus('error', 'Please enter your Raindrop Test Token.', true);
         return;
     }
 
     if (elements.apiToken.classList.contains('invalid')) {
         elements.settingsPanel.classList.add('force-visible');
         elements.apiToken.focus();
-        showStatus('error', 'Please provide a valid Test Token first.');
+        showStatus('error', 'Please provide a valid Test Token first.', true);
         return;
     }
 
@@ -405,14 +423,14 @@ elements.importBtn.addEventListener('click', async () => {
     // Fix: Trim configValue before validation to match saveState behavior
     const configValue = (STATE.method === 'tag' ? STATE.tagValue : STATE.collectionValue)?.trim();
 
-    if (!configValue) {
-        showStatus('error', `Please enter a ${STATE.method === 'tag' ? 'tag' : 'collection'} name.`);
+    if (STATE.method !== 'all' && !configValue) {
+        showStatus('error', `Please enter at least one ${STATE.method === 'tag' ? 'tag' : 'collection'}.`, true);
         return;
     }
 
     // 3. UI Loading State
     elements.importBtn.disabled = true;
-    elements.importBtn.querySelector('span').textContent = 'Syncing...';
+    elements.btnTitle.textContent = 'Syncing...';
     showStatus('loading', 'Fetching bookmarks from Raindrop...');
 
     // 4. Send to Background
@@ -430,19 +448,27 @@ elements.importBtn.addEventListener('click', async () => {
 
         // Fix: Validate response exists before accessing properties
         if (response && response.success) {
-            showStatus('success', `Done! Imported ${response.count} bookmarks.`);
             updateLastSyncDisplay(Date.now());
+            showStatus('success', `Done! Imported ${response.count} bookmarks.`, true);
         } else {
             const errorMsg = response?.error || 'Unknown error occurred';
-            showStatus('error', `Import Failed: ${errorMsg}`);
+            showStatus('error', `Sync Failed: ${errorMsg}`, true);
         }
     } catch (e) {
-        showStatus('error', `Error: ${e.message || 'Failed to communicate with background script'}`);
+        showStatus('error', `Error: ${e.message || 'Failed to communicate with background script'}`, true);
     } finally {
         elements.importBtn.disabled = false;
-        elements.importBtn.querySelector('span').textContent = 'Sync Now';
+        elements.btnTitle.textContent = 'Sync Now';
     }
 });
 
 // Initialize
 loadState();
+
+// Listen for progress updates from background
+browser.runtime.onMessage.addListener((msg) => {
+    if (msg.command === 'sync_progress' && elements.importBtn.classList.contains('loading')) {
+        const text = `Syncing... ${msg.percent}%`;
+        elements.btnSubtitle.innerHTML = `<div class="spinner-small"></div><span>${text}</span>`;
+    }
+});

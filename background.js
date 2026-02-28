@@ -155,7 +155,7 @@ async function getOrCreateCollectionFolder(raindropCollectionId, targetRootFolde
     const normalizedImportedId = importedRootCollectionId ? String(importedRootCollectionId) : null;
 
     // System collections / Unsorted (check both string and number forms)
-    const systemIds = ['-1', '-99', '0', '-1', '-99', '0'];
+    const systemIds = ['-1', '-99', '0'];
     if (!raindropCollectionId || systemIds.includes(normalizedId)) {
         return targetRootFolderId;
     }
@@ -229,8 +229,9 @@ function getDescendantCollectionIds(rootId) {
  * Helper: Fetch bookmarks from a specific endpoint and import them
  * @param {Set} sharedImportedIds - Shared Set for deduplication across multiple calls
  * @param {boolean} flattenImport - When true, imports directly to targetRootFolderId without subfolder creation
+ * @param {Object} progressState - Shared object to track total and current counts
  */
-async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRootFolderId, importedRootCollectionId = null, sharedImportedIds = null, flattenImport = false) {
+async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRootFolderId, importedRootCollectionId = null, sharedImportedIds = null, flattenImport = false, progressState = null) {
     let page = 0;
     let importedCount = 0;
     let hasMore = true;
@@ -266,6 +267,8 @@ async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRoo
             // Skip duplicates - handles both API boundary issues and multi-value deduplication
             const itemId = String(item._id);
             if (importedIds.has(itemId)) {
+                // If we skip here, we should still increment simulated progress if we're technically iterating
+                // but usually duplicates don't count towards the 'count' total returned by API
                 continue;
             }
             importedIds.add(itemId);
@@ -285,6 +288,18 @@ async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRoo
                 url: item.link
             });
             importedCount++;
+
+            // Report Progress
+            if (progressState && progressState.total > 0) {
+                progressState.current++;
+                const percent = Math.min(Math.round((progressState.current / progressState.total) * 100), 99);
+                browser.runtime.sendMessage({
+                    command: 'sync_progress',
+                    percent: percent,
+                    current: progressState.current,
+                    total: progressState.total
+                }).catch(() => { }); // Ignore errors if popup closed
+            }
         }
 
         // Improved pagination logic: Check if we got fewer items than page size
@@ -319,7 +334,7 @@ function findCollectionIdByName(name) {
 async function importRaindropBookmarks(settings) {
     const { apiToken, targetFolder, mode, configValue, flattenImport = false } = settings;
 
-    if (!apiToken || !targetFolder || !configValue) {
+    if (!apiToken || !targetFolder || (mode !== 'all' && !configValue)) {
         throw new Error('Missing required settings (Token, Folder, or Tag/Collection Name).');
     }
 
@@ -333,9 +348,9 @@ async function importRaindropBookmarks(settings) {
     for (const key in firefoxFolderCache) { delete firefoxFolderCache[key]; }
 
     // Parse comma-separated values
-    const values = configValue.split(',').map(v => v.trim()).filter(v => v.length > 0);
+    const values = configValue ? configValue.split(',').map(v => v.trim()).filter(v => v.length > 0) : [];
 
-    if (values.length === 0) {
+    if (mode !== 'all' && values.length === 0) {
         throw new Error('No valid values provided.');
     }
 
@@ -343,16 +358,72 @@ async function importRaindropBookmarks(settings) {
 
     // Shared Set for deduplication across all values
     const sharedImportedIds = new Set();
+    const progressState = { current: 0, total: 0 };
 
     try {
-        if (mode === 'tag') {
+        // 3. Pre-flight: Calculate Total Count for Progress
+        if (mode === 'all') {
+            const res = await rateLimitedFetch(`${RAINDROP_API_URL}/0?perpage=0`, {
+                headers: { 'Authorization': `Bearer ${apiToken}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                progressState.total = data.count || 0;
+            }
+        } else if (mode === 'tag') {
+            for (const tag of values) {
+                const tagValue = tag.startsWith('#') ? tag : `#${tag}`;
+                const searchQuery = encodeURIComponent(`"${tagValue}"`);
+                const res = await rateLimitedFetch(`${RAINDROP_API_URL}/0?search=${searchQuery}&perpage=0`, {
+                    headers: { 'Authorization': `Bearer ${apiToken}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    progressState.total += (data.count || 0);
+                }
+            }
+        } else if (mode === 'collection') {
+            for (const collectionName of values) {
+                const rootId = findCollectionIdByName(collectionName);
+                if (rootId) {
+                    const idsToCheck = [rootId, ...getDescendantCollectionIds(rootId)];
+                    for (const id of idsToCheck) {
+                        const res = await rateLimitedFetch(`${RAINDROP_API_URL}/${id}?perpage=0`, {
+                            headers: { 'Authorization': `Bearer ${apiToken}` }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            progressState.total += (data.count || 0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Start Import
+        if (mode === 'all') {
+            const url = RAINDROP_API_URL + '/0';
+            const searchParams = new URLSearchParams();
+
+            const count = await fetchAndImportFromEndpoint(
+                apiToken,
+                url,
+                searchParams,
+                targetRootFolderId,
+                null,
+                sharedImportedIds,
+                flattenImport,
+                progressState
+            );
+            totalImported += count;
+
+        } else if (mode === 'tag') {
             // Import by Tag(s): Loop through each tag
             const url = RAINDROP_API_URL + '/0';
 
             for (const tag of values) {
                 // Add # prefix if tag doesn't already start with it, and wrap in quotes for spaces
                 const tagValue = tag.startsWith('#') ? tag : `#${tag}`;
-                // Wrap in double quotes to handle tags with spaces
                 const searchQuery = `"${tagValue}"`;
                 const searchParams = new URLSearchParams({ search: searchQuery });
 
@@ -361,26 +432,25 @@ async function importRaindropBookmarks(settings) {
                     url,
                     searchParams,
                     targetRootFolderId,
-                    null,  // no importedRootCollectionId for tags
+                    null,
                     sharedImportedIds,
-                    flattenImport
+                    flattenImport,
+                    progressState
                 );
                 totalImported += count;
             }
 
         } else if (mode === 'collection') {
-            // Import by Collection(s): Loop through each collection
+            // Import by Collection(s)
             const notFoundCollections = [];
 
             for (const collectionName of values) {
                 const rootCollectionId = findCollectionIdByName(collectionName);
-
                 if (!rootCollectionId) {
                     notFoundCollections.push(collectionName);
                     continue;
                 }
 
-                // If importing multiple collections, create a wrapper folder for each
                 let currentTargetId = targetRootFolderId;
                 if (values.length > 1) {
                     const collectionData = collectionMap[rootCollectionId];
@@ -391,15 +461,11 @@ async function importRaindropBookmarks(settings) {
                     currentTargetId = wrapperFolder.id;
                 }
 
-                // Get target + all children
                 const collectionsToFetch = [rootCollectionId, ...getDescendantCollectionIds(rootCollectionId)];
-
                 for (const collectionId of collectionsToFetch) {
                     const url = RAINDROP_API_URL + `/${collectionId}`;
                     const searchParams = new URLSearchParams();
 
-                    // Pass rootCollectionId to preserve nested structure
-                    // Note: For collections, we ALWAYS preserve subfolder structure (flattenImport doesn't affect this)
                     const count = await fetchAndImportFromEndpoint(
                         apiToken,
                         url,
@@ -407,7 +473,8 @@ async function importRaindropBookmarks(settings) {
                         currentTargetId,
                         rootCollectionId,
                         sharedImportedIds,
-                        false  // Never flatten collections - always preserve structure
+                        false,
+                        progressState
                     );
                     totalImported += count;
                 }
@@ -428,6 +495,7 @@ async function importRaindropBookmarks(settings) {
         console.error('Import failed:', error);
         // Clear cache on error to prevent stale data
         for (const key in firefoxFolderCache) { delete firefoxFolderCache[key]; }
+        for (const key in collectionMap) { delete collectionMap[key]; }
         return { success: false, error: error.message };
     }
 }
@@ -445,7 +513,7 @@ async function performSilentSync() {
         }
 
         const configValue = stored.method === 'tag' ? stored.tagValue : stored.collectionValue;
-        if (!configValue) {
+        if (stored.method !== 'all' && !configValue) {
             console.warn('Auto-sync skipped: Missing tag/collection value.');
             return;
         }

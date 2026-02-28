@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Raindrop.io Sync",
-  "version": "1.3",
+  "version": "1.4",
   "author": "BXZ1",
   "homepage_url": "https://github.com/BXZ1/raindrop-sync-firefox",
   "description": "Syncs from Raindrop.io to your Firefox Bookmarks Toolbar.",

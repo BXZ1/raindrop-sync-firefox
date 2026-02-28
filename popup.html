@@ -27,18 +27,19 @@
             <div id="settingsPanel" class="settings-outer section-outer" data-label="Settings">
                 <div class="section-inner">
                     <div class="form-group">
-                        <div class="label-with-help">
-                            <label for="apiToken">Test Token</label>
-                            <span class="help-btn-text" id="tokenHelpBtn" title="Token setup instructions">( How to
-                                get a token? )</span>
+                        <div class="input-header">
+                            <span class="input-header-label">Raindrop TEST Token</span>
+                            <span class="help-btn-text" id="tokenHelpBtn" title="How to get a token?">( Where's my
+                                token? )</span>
+                            <div class="input-header-divider"></div>
                             <div class="tooltip" id="tokenTooltip">
                                 <strong>1.</strong> Go to Raindrop.io <a
                                     href="https://app.raindrop.io/settings/integrations" target="_blank">Settings >
                                     Integrations</a><br>
-                                <strong>2.</strong> Scroll to <em>"For Developers"</em> and click on <em>Create a new
-                                    app</em><br>
-                                <strong>3.</strong> Give it a name and save.<br>
-                                <strong>4.</strong> Click your app > <em>"Create test token"</em>.<br>
+                                <strong>2.</strong> Scroll to <em>"For Developers"</em> and click on <em>"Create a new
+                                    app"</em><br>
+                                <strong>3.</strong> Give it a name and save<br>
+                                <strong>4.</strong> Click your app > <em>"Create test token"</em><br>
                                 <strong>5.</strong> Copy and paste it here
                             </div>
                         </div>
@@ -46,21 +47,23 @@
                         <small id="tokenStatus" class="helper-text"></small>
                     </div>
                     <div class="form-group">
-                        <div class="label-with-help">
-                            <label for="targetFolder">Toolbar Folder Name</label>
+                        <div class="input-header">
+                            <span class="input-header-label">Toolbar Folder Name</span>
                             <button type="button" class="help-btn" id="folderHelpBtn"
                                 title="About target folder">?</button>
+                            <div class="input-header-divider"></div>
                             <div class="tooltip" id="folderTooltip">
                                 The folder in your <strong>Bookmarks Toolbar</strong> where synced bookmarks will be
                                 placed.
                             </div>
                         </div>
                         <input type="text" id="targetFolder" placeholder="" value="Imported from Raindrop">
-                        <small class="helper-text">⚠️ Content in this folder will be overwritten.</small>
+                        <small class="helper-text">⚠️ Existing bookmarks in this folder will be overwritten.</small>
                     </div>
                     <div class="form-group">
-                        <div class="label-with-help">
-                            <label for="syncInterval">Auto Sync</label>
+                        <div class="input-header">
+                            <span class="input-header-label">Auto Sync Frequency</span>
+                            <div class="input-header-divider"></div>
                         </div>
                         <select id="syncInterval" class="sync-select">
                             <option value="0">🚫 Off (Manual)</option>
@@ -82,11 +85,15 @@
                         <div class="method-card selected" data-method="collection"
                             title="Sync all bookmarks inside specific folders">
                             <span class="method-icon">📁</span>
-                            <span class="method-name">By Collection</span>
+                            <span class="method-name">Collections</span>
                         </div>
                         <div class="method-card" data-method="tag" title="Sync all bookmarks that have specific tags">
                             <span class="method-icon">🏷️</span>
-                            <span class="method-name">By Tag</span>
+                            <span class="method-name">Tags</span>
+                        </div>
+                        <div class="method-card" data-method="all" title="Sync all your Raindrop bookmarks">
+                            <span class="method-icon">🌍</span>
+                            <span class="method-name">All</span>
                         </div>
                     </div>
 
@@ -94,34 +101,39 @@
                     <div class="input-area">
                         <div class="form-group" id="collectionInputGroup">
                             <div class="input-header">
-                                <span class="input-header-label">📁 Select Collections</span>
+                                <span class="input-header-label">Collections to Sync</span>
                                 <div class="input-header-divider"></div>
                             </div>
-                            <input type="text" id="configValueCollection" placeholder="Bookmarks, Tech Tips, Work"
-                                value="Bookmarks">
-                            <small class="input-helper">Multiple names allowed (e.g. Bookmarks, Tech Tips)</small>
+                            <input type="text" id="configValueCollection" placeholder="e.g.Work, Technical, Projects"
+                                value="">
+                            <small class="input-helper">Separate multiple collections with commas</small>
                         </div>
                         <div class="form-group" id="tagInputGroup" style="display: none;">
                             <div class="input-header">
-                                <span class="input-header-label">🏷️ Select Tags</span>
+                                <span class="input-header-label">Tags to Sync</span>
                                 <div class="input-header-divider"></div>
                             </div>
-                            <input type="text" id="configValueTag" placeholder="firefox, tech tips, news"
-                                value="firefox">
-                            <small class="input-helper">Multiple names allowed (e.g. firefox, tech tips)</small>
+                            <input type="text" id="configValueTag" placeholder="e.g. recipe, article, news" value="">
+                            <small class="input-helper">Separate multiple tags with commas</small>
+                        </div>
+
+                        <div class="form-group" id="allInputGroup" style="display: none;">
+                            <div class="everything-note">
+                                <span>Your entire Raindrop library will be synced.</span>
+                            </div>
                         </div>
 
                         <!-- Flatten Option -->
                         <div class="checkbox-group">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="flattenImport">
-                                <span>Flatten Structure</span>
+                                <span>Flatten Folders</span>
                             </label>
-                            <button type="button" class="help-btn" id="flattenHelpBtn" title="More info">?</button>
+                            <button type="button" class="help-btn" id="flattenHelpBtn" title="What is this?">?</button>
                             <div class="tooltip" id="flattenTooltip">
                                 <strong>Checked:</strong> All bookmarks are imported directly into your toolbar folder
                                 without subfolders.<br><br>
-                                <strong>Unchecked:</strong> Preserves original Raindrop folder structure.
+                                <strong>Unchecked:</strong> Preserves your Raindrop.io folder structure.
                             </div>
                         </div>
                     </div>
@@ -130,15 +142,9 @@
 
             <!-- Action Area -->
             <button id="importBtn" class="import-btn">
-                <span>Sync Now</span>
+                <div class="btn-main-title" id="btnTitle">Sync Now</div>
+                <div class="btn-sub-title" id="btnSubtitle">Last Sync: Never</div>
             </button>
-            <p id="lastSyncMsg" class="last-sync">Last Sync: Never</p>
-
-            <!-- Status Feedback -->
-            <div id="statusMsg" class="status-msg hidden">
-                <div class="status-icon"></div>
-                <span class="status-text"></span>
-            </div>
         </main>
 
         <footer>
