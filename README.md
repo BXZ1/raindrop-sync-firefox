@@ -21,7 +21,7 @@ Raindrop.io Sync is a specialized Firefox extension that bridges the gap between
 Most bookmark managers keep your links tucked away in a separate app. This extension puts them exactly where you need them: **the native Firefox Bookmarks Toolbar.**
 
 *   **Set and Forget**: Scheduled **Auto-Sync** keeps your toolbar fresh every few hours, daily, or weekly.
-*   **Source Selection**: Sync multiple **Collections** or **#tags** at once (separated by commas).
+*   **Source Selection**: Sync multiple **Collections**, **#tags** (separated by commas), or your **entire library**.
 *   **Respects Manual Order**: Perfectly mirrors your **manual sorting** and folder structure from Raindrop.
 *   **Optional Flattening**: Choose to import everything into a single folder or preserve subfolders.
 *   **Offline Reliability**: Won't touch your bookmarks if the API is down or you're offline.
@@ -36,13 +36,13 @@ Most bookmark managers keep your links tucked away in a separate app. This exten
     *   Give it any name (e.g., `Firefox Sync`) and save.
     *   Click on your new app, then click **"Create test token"**.
     *   Copy the token and paste it into the extension's **API Token** field.
-3.  **Pick your Source**: Select the **By Collection** or **By Tag** method. You can enter multiple names separated by commas (e.g., `Work, News, Tech Tips`).
+3.  **Pick your Source**: Select the **Collections**, **Tags**, or **All** method. You can enter multiple names separated by commas (e.g., `Work, News, Tech Tips`).
 4.  **Set the Target**: Choose which folder in your **Bookmarks Toolbar** should hold the synced links (Default: `Imported from Raindrop`).
 5.  **Schedule Sync**: Choose your frequency and let the background script do the work.
 
 ## Support ⭐
 
-If you find this tool useful, please consider giving it a **Star** on [GitHub](https://github.com/BXZ1/raindrop-sync-firefox). It helps the project grow and stay maintained!
+If you find this useful, please consider **leaving a review on the [Firefox Add-on page](https://addons.mozilla.org/en-US/firefox/addon/raindrop-sync-firefox/)** or **starring the [GitHub repo](https://github.com/BXZ1/raindrop-sync-firefox)**. It helps with visibility and makes it easier for more people to discover the add-on!
 
 ## Development 🛠️
 

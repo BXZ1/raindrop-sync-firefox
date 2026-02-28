@@ -80,6 +80,14 @@ async function loadState() {
 
         updateLastSyncDisplay(stored.lastSync);
         fetchGitHubStars();
+
+        // Check if sync is currently in progress in background
+        const syncStatus = await browser.runtime.sendMessage({ command: 'get_sync_status' });
+        if (syncStatus && syncStatus.isSyncing) {
+            elements.importBtn.disabled = true;
+            elements.btnTitle.textContent = 'Syncing...';
+            showStatus('loading', `Syncing... ${syncStatus.percent}%`);
+        }
     } catch (e) {
         console.error('Failed to load state', e);
     }
@@ -468,7 +476,12 @@ loadState();
 // Listen for progress updates from background
 browser.runtime.onMessage.addListener((msg) => {
     if (msg.command === 'sync_progress' && elements.importBtn.classList.contains('loading')) {
-        const text = `Syncing... ${msg.percent}%`;
-        elements.btnSubtitle.innerHTML = `<div class="spinner-small"></div><span>${text}</span>`;
+        const progressSpan = elements.btnSubtitle.querySelector('span');
+        if (progressSpan) {
+            progressSpan.textContent = `Syncing... ${msg.percent}%`;
+        } else {
+            // Fallback if structure isn't there yet
+            elements.btnSubtitle.innerHTML = `<div class="spinner-small"></div><span>Syncing... ${msg.percent}%</span>`;
+        }
     }
 });

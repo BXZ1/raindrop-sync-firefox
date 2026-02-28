@@ -18,6 +18,14 @@ const firefoxFolderCache = {};
 // Rate limiting: Track last request time
 let lastRequestTime = 0;
 
+// Track active sync for popup persistence
+let SYNC_STATE = {
+    isSyncing: false,
+    percent: 0,
+    count: 0,
+    total: 0
+};
+
 /**
  * Rate limiting helper: Ensures we don't exceed API rate limits
  * Raindrop.io allows 120 requests per minute (~500ms between requests)
@@ -293,6 +301,9 @@ async function fetchAndImportFromEndpoint(apiToken, url, searchParams, targetRoo
             if (progressState && progressState.total > 0) {
                 progressState.current++;
                 const percent = Math.min(Math.round((progressState.current / progressState.total) * 100), 99);
+                SYNC_STATE.percent = percent;
+                SYNC_STATE.count = progressState.current;
+                SYNC_STATE.total = progressState.total;
                 browser.runtime.sendMessage({
                     command: 'sync_progress',
                     percent: percent,
@@ -339,6 +350,7 @@ async function importRaindropBookmarks(settings) {
     }
 
     // 1. Fetch Structure First
+    SYNC_STATE = { isSyncing: true, percent: 0, count: 0, total: 0 };
     await fetchRaindropCollections(apiToken);
 
     // 2. Prepare Target Folder (Clean Slate)
@@ -496,7 +508,10 @@ async function importRaindropBookmarks(settings) {
         // Clear cache on error to prevent stale data
         for (const key in firefoxFolderCache) { delete firefoxFolderCache[key]; }
         for (const key in collectionMap) { delete collectionMap[key]; }
+        SYNC_STATE.isSyncing = false; // Reset on error
         return { success: false, error: error.message };
+    } finally {
+        SYNC_STATE.isSyncing = false; // Reset on completion
     }
 }
 
@@ -609,6 +624,11 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     if (message.command === 'update_alarm') {
         updateAlarm(message.interval).then(() => sendResponse({ status: 'ok' }));
+        return true;
+    }
+
+    if (message.command === 'get_sync_status') {
+        sendResponse(SYNC_STATE);
         return true;
     }
 });

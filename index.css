@@ -361,6 +361,10 @@ input.invalid {
     margin-bottom: 0;
 }
 
+.input-area .form-group {
+    margin-bottom: 0;
+}
+
 /* Checkbox Group */
 .checkbox-group {
     display: flex;
@@ -544,9 +548,8 @@ input.invalid {
 
 .btn-sub-title {
     font-size: 12px;
-    font-weight: 600;
-    opacity: 1;
-    /* Full opacity for maximum readability */
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
     display: flex;
     align-items: center;
     gap: 8px;
